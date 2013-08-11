@@ -18,6 +18,21 @@ public class Actor<T, V> {
         return this.thread.sendSync(this, message);
     }
 
+    public void sendSilent(T message) {
+        try {
+            this.thread.send(this, message);
+        } catch (ActorStoppedException e) {
+            throw new RuntimeException(e);
+        }
+    }
+    public V sendSyncSilent(T message) {
+        try {
+            return this.thread.sendSync(this, message);
+        } catch (ActorStoppedException e) {
+            throw new RuntimeException(e);
+        }
+    }
+
     public V onMessage(T message) {
         return this.behavior.onMessage(message);
     }

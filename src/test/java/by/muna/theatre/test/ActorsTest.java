@@ -56,5 +56,29 @@ public class ActorsTest {
         }
 
         Assert.assertTrue("ActorStoppedException catched after .stop()", catched);
+
+        catched = false;
+
+        try {
+            actor.sendSilent(77);
+        } catch (RuntimeException e) {
+            catched = true;
+
+            Assert.assertEquals(ActorStoppedException.class, e.getCause().getClass());
+        }
+
+        Assert.assertTrue(".sendSilent throws RuntimeException", catched);
+
+        catched = false;
+
+        try {
+            actor.sendSyncSilent(88);
+        } catch (RuntimeException e) {
+            catched = true;
+
+            Assert.assertEquals(ActorStoppedException.class, e.getCause().getClass());
+        }
+
+        Assert.assertTrue(".sendSyncSilent throws RuntimeException", catched);
     }
 }
