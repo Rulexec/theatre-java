@@ -30,6 +30,17 @@ public class ActorsThreadImpl implements ActorsThread {
         }
     }
     private static class ActorThreadStopped {}
+    private static class ActorExceptionCatched {
+        private Exception exception;
+
+        public ActorExceptionCatched(Exception exception) {
+            this.exception = exception;
+        }
+
+        public Exception getException() {
+            return this.exception;
+        }
+    }
 
     private Thread thread;
     private boolean isStop = false;
@@ -63,7 +74,7 @@ public class ActorsThreadImpl implements ActorsThread {
 
     @Override
     @SuppressWarnings("unchecked")
-    public synchronized <T, V> V sendSync(Actor<T, V> actor, T message) throws ActorStoppedException {
+    public synchronized <T, V> V sendSync(Actor<T, V> actor, T message) throws Exception {
         if (this.isStop) throw new ActorStoppedException();
 
         this.messages.add(new ActorMessage((Actor<Object, Object>) actor, message, true));
@@ -71,10 +82,10 @@ public class ActorsThreadImpl implements ActorsThread {
         try {
             Object result = this.syncResults.take();
 
-            if (this.isStop && result instanceof ActorThreadStopped) {
-                throw new ActorStoppedException();
-            } else {
+            if (!(result instanceof ActorExceptionCatched)) {
                 return (V) result;
+            } else {
+                throw ((ActorExceptionCatched) result).getException();
             }
         } catch (InterruptedException e) {
             throw new RuntimeException("Interrupted", e);
@@ -89,7 +100,7 @@ public class ActorsThreadImpl implements ActorsThread {
         if (!this.handleCurrent) {
             this.thread.interrupt();
 
-            this.syncResults.add(new ActorThreadStopped());
+            this.syncResults.add(new ActorExceptionCatched(new ActorStoppedException()));
         }
 
         try {
@@ -105,10 +116,24 @@ public class ActorsThreadImpl implements ActorsThread {
                 Actor<Object, Object> actor = actorMessage.getActor();
                 Object message = actorMessage.getMessage();
 
-                Object result = actor.onMessage(message);
+                Object result;
+                Exception exception = null;
+
+                try {
+                    result = actor.onMessage(message);
+                } catch (Exception e) {
+                    exception = e;
+
+                    result = new ActorExceptionCatched(exception);
+                }
 
                 if (actorMessage.isSync()) {
                     this.syncResults.put(result);
+                } else {
+                    if (exception != null) {
+                        // crash, if exception on async send
+                        throw new RuntimeException(exception);
+                    }
                 }
             }
         } catch (InterruptedException e) {}

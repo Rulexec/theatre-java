@@ -2,9 +2,12 @@ package by.muna.theatre;
 
 import by.muna.theatre.exceptions.ActorStoppedException;
 
-public class Actor<T, V> {
+public class Actor<T, V> implements ActorBehavior<T, V> {
     private ActorsThread thread;
     private ActorBehavior<T, V> behavior;
+
+    private boolean stopped = false;
+    private boolean handleCurrent = true;
 
     public Actor(ActorsThread thread, ActorBehavior<T, V> behavior) {
         this.thread = thread;
@@ -12,9 +15,13 @@ public class Actor<T, V> {
     }
 
     public void send(T message) throws ActorStoppedException {
+        if (this.stopped) throw new ActorStoppedException();
+
         this.thread.send(this, message);
     }
-    public V sendSync(T message) throws ActorStoppedException {
+    public V sendSync(T message) throws Exception {
+        if (this.stopped) throw new ActorStoppedException();
+
         return this.thread.sendSync(this, message);
     }
 
@@ -25,7 +32,7 @@ public class Actor<T, V> {
             throw new RuntimeException(e);
         }
     }
-    public V sendSyncSilent(T message) {
+    public V sendSyncSilent(T message) throws Exception {
         try {
             return this.thread.sendSync(this, message);
         } catch (ActorStoppedException e) {
@@ -33,7 +40,25 @@ public class Actor<T, V> {
         }
     }
 
-    public V onMessage(T message) {
-        return this.behavior.onMessage(message);
+    public void stop() {
+        this.stopped = true;
+    }
+    public void stop(boolean handleCurrent) {
+        this.stopped = true;
+        this.handleCurrent = handleCurrent;
+    }
+
+    @Override
+    public V onMessage(T message) throws Exception {
+        if (this.stopped && !this.handleCurrent) throw new ActorStoppedException();
+
+        try {
+            return this.behavior.onMessage(message);
+        } catch (ActorStoppedException e) {
+            this.stopped = true;
+            this.handleCurrent = false;
+
+            throw e;
+        }
     }
 }

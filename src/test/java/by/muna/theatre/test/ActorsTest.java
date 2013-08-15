@@ -13,7 +13,7 @@ import java.util.concurrent.TimeUnit;
 
 public class ActorsTest {
     @Test
-    public void actorsTest() throws InterruptedException {
+    public void actorsTest() throws Exception {
         ActorsThread actors = new ActorsThreadImpl();
 
         final CountDownLatch countdown = new CountDownLatch(1);
@@ -80,5 +80,29 @@ public class ActorsTest {
         }
 
         Assert.assertTrue(".sendSyncSilent throws RuntimeException", catched);
+    }
+
+    @Test
+    public void exceptionFromOnMessage() {
+        ActorsThread actorsThread = new ActorsThreadImpl();
+
+        Actor<Integer, Integer> actor = actorsThread.createActor(new ActorBehavior<Integer, Integer>() {
+            @Override
+            public Integer onMessage(Integer message) throws Exception {
+                throw new Exception("This should be catched!");
+            }
+        });
+
+        boolean catched = false;
+
+        try {
+            actor.sendSync(42);
+        } catch (Exception e) {
+            Assert.assertEquals("This should be catched!", e.getMessage());
+
+            catched = true;
+        }
+
+        Assert.assertTrue("Not catched", catched);
     }
 }
